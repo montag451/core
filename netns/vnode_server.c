@@ -16,6 +16,8 @@
 #include <string.h>
 #include <limits.h>
 #include <assert.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include <arpa/inet.h>
 #include <sys/wait.h>
@@ -228,6 +230,32 @@ static vnode_server_t *vnode_newserver(struct ev_loop *loop,
   return server;
 }
 
+static int set_userns_mapping(int pid,
+                              const char *type,
+                              uint32_t uid,
+                              uint32_t loweruid,
+                              uint32_t count)
+{
+  char fname[256];
+  size_t size = sizeof(fname);
+  if (snprintf(fname, size, "/proc/%d/%s_map", pid, type) < size)
+  {
+    FILE *f = fopen(fname, "w");
+    if (f != NULL)
+    {
+      fprintf(f, "%"PRIu32" %"PRIu32" %"PRIu32, uid, loweruid, count);
+      fclose(f);
+      return 0;
+    }
+    else
+    {
+      WARN("fopen() failed for '%s'", fname);
+    }
+  }
+  WARN("failed to set %s mapping for '%d'", type, pid);
+  return -1;
+}
+
 void vnode_delserver(vnode_server_t *server)
 {
   unlink(server->ctrlchnlname);
@@ -321,7 +349,27 @@ vnode_server_t *vnoded(int newnetns, const char *ctrlchnlname,
     }
 
     if (newnetns)
+    {
+      /* setup UID and GID mappings in the new user namespace */
+      set_userns_mapping(pid, "uid", 0, 100000, 65536);
+      set_userns_mapping(pid, "gid", 0, 100000, 65536);
       _exit(0);		       /* nothing else for the parent to do */
+    }
+  }
+
+  /* Ugly, instead use a pipe to synchronize with the parent */
+  sleep(2);
+
+  if (newnetns)
+  {
+      if (setuid(0) != 0)
+      {
+        WARN("failed to change UID to 0");
+      }
+      if (setgid(0) != 0)
+      {
+        WARN("failed to change UID to 0");
+      }
   }
 
   /* try to close any open files */

@@ -29,7 +29,8 @@
    CLONE_NEWUTS  |				\
    CLONE_NEWIPC  |				\
    CLONE_NEWPID	 |				\
-   CLONE_NEWNET					\
+   CLONE_NEWNET  |				\
+   CLONE_NEWUSER				\
   )
 
 #define MOUNT_SYS_MIN_VERSION "2.6.35"
